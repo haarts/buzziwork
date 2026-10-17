@@ -1,0 +1,15 @@
+[Unit]
+Description=buzziwork Signal task bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=buzziwork
+WorkingDirectory=/var/lib/buzziwork
+EnvironmentFile=/etc/buzziwork.env
+ExecStart=/usr/local/bin/buzziwork
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
