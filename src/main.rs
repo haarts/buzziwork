@@ -3,6 +3,7 @@ mod bot;
 mod db;
 mod llm;
 mod signal;
+mod web;
 
 use anyhow::{Context, Result, bail};
 use std::sync::Arc;
@@ -28,7 +29,19 @@ async fn main() -> Result<()> {
         env("OPENROUTER_MODEL").unwrap_or_else(|| "anthropic/claude-haiku-5.5".into()),
     );
 
-    let db = db::Db::open(&db_path).with_context(|| format!("opening {db_path}"))?;
+    let db = Arc::new(db::Db::open(&db_path).with_context(|| format!("opening {db_path}"))?);
+
+    if let Some(addr) = env("BOARD_LISTEN") {
+        let token = env("BOARD_TOKEN").context("BOARD_TOKEN is required when BOARD_LISTEN is set")?;
+        let title = env("BOARD_TITLE").unwrap_or_else(|| "Klussen".into());
+        let db = db.clone();
+        tokio::spawn(async move {
+            if let Err(e) = web::serve(&addr, db, token, title).await {
+                log::error!("web board stopped: {e:#}");
+            }
+        });
+    }
+
     let (sig, mut rx) = signal::Signal::spawn(&signal_cli, account.as_deref(), config_dir.as_deref())?;
     let bot = Arc::new(bot::Bot::new(db, sig, llm, group_id, web_url));
     tokio::spawn(bot.clone().daily_loop(board_hour));

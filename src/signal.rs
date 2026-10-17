@@ -279,7 +279,7 @@ mod tests {
             "dataMessage": {
                 "timestamp": 10,
                 "message": "\u{FFFC} doe jij de goot?",
-                "mentions": [{"name": "Noah", "uuid": "u-2", "start": 0, "length": 1}],
+                "mentions": [{"name": "Sem", "uuid": "u-2", "start": 0, "length": 1}],
                 "groupInfo": {"groupId": "G=", "type": "DELIVER"},
                 "quote": {"id": 5, "author": "x", "text": "goot west"}
             }}});
@@ -288,7 +288,7 @@ mod tests {
         assert_eq!(
             i.kind,
             Kind::Text {
-                text: "@Noah doe jij de goot?".into(),
+                text: "@Sem doe jij de goot?".into(),
                 quote: Some((5, "goot west".into()))
             }
         );

@@ -22,6 +22,7 @@ Dutch-speaking). Owner: Harm (harm@aarts.email). Read README.md for user-facing 
 - **Trello-ish model, one level deep:** project → task. No checklists/labels/priorities yet.
   Statuses: todo | doing | waiting | done | dropped.
 - UI strings are Dutch.
+- Example people in tests/docs are fictional (Harm, Sem, Daan).
 
 ## Data model
 
@@ -36,7 +37,8 @@ kv(key, value) — board_ts, board_edits, board_text, board_daily, group_id.
 - `src/signal.rs` — JSON-RPC client, `Messenger` trait, `parse_incoming` (envelope → `Incoming`)
 - `src/llm.rs` — `Interpreter` trait, OpenRouter impl, prompt, `Plan`/`Action`
 - `src/bot.rs` — message/reaction handling, applying actions, board refresh, daily loop, LLM context
-- `src/board.rs` — text rendering
+- `src/board.rs` — text rendering for Signal
+- `src/web.rs` + `src/board.html` — read-only web board (axum), token in path, fonts embedded from `static/fonts`
 - `src/db.rs` — SQLite
 
 `Bot<M: Messenger, L: Interpreter>` is generic so tests use fakes (see `bot.rs` tests).
@@ -57,6 +59,7 @@ that speaks the JSON-RPC protocol and `OPENROUTER_BASE_URL` at a local fake.
 ## Next
 
 1. Run against real signal-cli, fix field names.
-2. Web board: small read-only page served by the same binary (axum or tiny_http), mobile-first,
-   linked via `BOARD_URL`. Kanban columns per status, grouped by project.
+2. Web board polish once real data flows (it exists: `src/web.rs`). Design: limewash/slate
+   palette, Big Shoulders Display for numbers/headings, Atkinson Hyperlegible for text
+   (readable in sunlight on site); keep that direction.
 3. Reminders for due/overdue tasks in the daily board or a DM.

@@ -15,24 +15,23 @@ pub fn status_emoji(s: &str) -> &'static str {
     }
 }
 
-/// "di 20/10", with a warning sign when it's in the past and the task is open.
+/// "di 20/10"
+pub fn fmt_date(d: NaiveDate) -> String {
+    format!("{} {}/{}", WEEKDAYS[d.weekday().num_days_from_monday() as usize], d.day(), d.month())
+}
+
+/// "📅 di 20/10", with a warning sign when it's in the past and the task is open.
 pub fn fmt_due(due: &str, status: &str, today: NaiveDate) -> String {
     match NaiveDate::parse_from_str(due, "%Y-%m-%d") {
         Ok(d) => {
             let late = d < today && status != "done" && status != "dropped";
-            format!(
-                "{}📅 {} {}/{}",
-                if late { "⚠️" } else { "" },
-                WEEKDAYS[d.weekday().num_days_from_monday() as usize],
-                d.day(),
-                d.month()
-            )
+            format!("{}📅 {}", if late { "⚠️" } else { "" }, fmt_date(d))
         }
         Err(_) => format!("📅 {due}"),
     }
 }
 
-/// One line: `🔨 #3 Zink links · Noah · 📅 di 20/10`.
+/// One line: `🔨 #3 Zink links · Sem · 📅 di 20/10`.
 pub fn task_line(t: &Task, today: NaiveDate, with_project: bool) -> String {
     let mut s = format!("{} #{} {}", status_emoji(&t.status), t.id, t.title);
     if with_project && let Some(p) = &t.project {
@@ -109,7 +108,7 @@ mod tests {
             notes: None,
             status: status.into(),
             project: project.map(String::from),
-            assignee: Some("Noah".into()),
+            assignee: Some("Sem".into()),
             due_date: Some("2026-10-16".into()),
             done_at: None,
         }

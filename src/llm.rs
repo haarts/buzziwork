@@ -78,7 +78,7 @@ Rules:
 - Reuse an existing project name when it fits (case-insensitive, synonyms like dakkapel/dormer). Only put a project on a task when it clearly belongs to one.
 - To change an existing task use update_task with its #id from the task list. Omit fields you do not change. "dropped" = cancelled.
 - If several tasks are mentioned in one message, emit several actions.
-- Set "reply" only when someone asks a question (e.g. "wat moet Noah nog doen?", "wat staat er voor morgen?") — answer briefly from the task list — or when you need to flag a problem (ambiguous task, unknown person). Do NOT reply just to confirm; the bot confirms changes itself.
+- Set "reply" only when someone asks a question (e.g. "wat moet Sem nog doen?", "wat staat er voor morgen?") — answer briefly from the task list — or when you need to flag a problem (ambiguous task, unknown person). Do NOT reply just to confirm; the bot confirms changes itself.
 - Reply in the language of the message. Keep it short; plain text, no markdown."#;
 
 pub struct OpenRouter {
@@ -147,10 +147,10 @@ mod tests {
 
     #[test]
     fn parses_fenced_plan() {
-        let s = "```json\n{\"reply\":null,\"actions\":[{\"op\":\"create_task\",\"title\":\"Goot west\",\"assignee\":\"Noah\",\"due\":\"2026-10-20\"},{\"op\":\"update_task\",\"id\":3,\"status\":\"done\"},{\"op\":\"show_board\"}]}\n```";
+        let s = "```json\n{\"reply\":null,\"actions\":[{\"op\":\"create_task\",\"title\":\"Goot west\",\"assignee\":\"Sem\",\"due\":\"2026-10-20\"},{\"op\":\"update_task\",\"id\":3,\"status\":\"done\"},{\"op\":\"show_board\"}]}\n```";
         let p = parse_plan(s).unwrap();
         assert_eq!(p.actions.len(), 3);
-        assert!(matches!(&p.actions[0], Action::CreateTask { title, assignee: Some(a), .. } if title == "Goot west" && a == "Noah"));
+        assert!(matches!(&p.actions[0], Action::CreateTask { title, assignee: Some(a), .. } if title == "Goot west" && a == "Sem"));
         assert!(matches!(&p.actions[1], Action::UpdateTask { id: 3, status: Some(s), .. } if s == "done"));
         assert_eq!(p.actions[2], Action::ShowBoard);
     }

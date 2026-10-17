@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>{{TITLE}}</title>
+<style>
+/* Fonts are served by the bot itself: no third-party requests from the board. */
+@font-face { font-family: "Big Shoulders Display"; font-weight: 600; font-display: swap; src: url("/fonts/big-shoulders-display-600.woff2") format("woff2"); }
+@font-face { font-family: "Big Shoulders Display"; font-weight: 800; font-display: swap; src: url("/fonts/big-shoulders-display-800.woff2") format("woff2"); }
+@font-face { font-family: "Atkinson Hyperlegible"; font-weight: 400; font-display: swap; src: url("/fonts/atkinson-hyperlegible-400.woff2") format("woff2"); }
+@font-face { font-family: "Atkinson Hyperlegible"; font-weight: 400; font-style: italic; font-display: swap; src: url("/fonts/atkinson-hyperlegible-400-italic.woff2") format("woff2"); }
+@font-face { font-family: "Atkinson Hyperlegible"; font-weight: 700; font-display: swap; src: url("/fonts/atkinson-hyperlegible-700.woff2") format("woff2"); }
+
+:root {
+  --bg: #e9ece8;        /* limewash */
+  --card: #f8f9f6;
+  --ink: #1d2a32;       /* slate */
+  --muted: #5f6e75;     /* zinc */
+  --rule: #c9d0cc;
+  --oak: #a8701f;       /* doing */
+  --slate: #4f6488;     /* waiting */
+  --moss: #4b6a37;      /* done */
+  --brick: #a2371f;     /* late */
+  --focus: #2f5fd0;
+  --proj-strength: 100%;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #151d22; --card: #1e292f; --ink: #e4e9e5; --muted: #95a3a9; --rule: #33434b;
+    --oak: #d9a24c; --slate: #8ea3c9; --moss: #8cb171; --brick: #e2775c; --focus: #8db0ff; --proj-strength: 55%;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #151d22; --card: #1e292f; --ink: #e4e9e5; --muted: #95a3a9; --rule: #33434b;
+  --oak: #d9a24c; --slate: #8ea3c9; --moss: #8cb171; --brick: #e2775c; --focus: #8db0ff; --proj-strength: 55%;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 1.0625rem/1.5 "Atkinson Hyperlegible", system-ui, sans-serif;
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 48px max(16px, env(safe-area-inset-left));
+}
+.wrap { max-width: 1280px; margin: 0 auto; }
+
+header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 16px; margin-bottom: 16px; }
+h1 {
+  font: 800 clamp(2.4rem, 9vw, 3.6rem)/0.9 "Big Shoulders Display", Impact, sans-serif;
+  letter-spacing: 0.01em;
+  margin: 0;
+}
+.updated { color: var(--muted); font-size: 0.9rem; margin: 0; }
+
+/* who-filter */
+.who { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 12px; margin: 0 -2px 8px; scrollbar-width: none; }
+.who::-webkit-scrollbar { display: none; }
+.who button {
+  flex: none;
+  font: 700 1rem/1 "Atkinson Hyperlegible", system-ui, sans-serif;
+  color: var(--ink);
+  background: transparent;
+  border: 2px solid var(--rule);
+  border-radius: 999px;
+  padding: 10px 16px;
+  min-height: 44px;
+  cursor: pointer;
+}
+.who button[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+button:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+/* columns */
+main { display: grid; gap: 28px; }
+@media (min-width: 900px) {
+  main { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; align-items: start; }
+}
+.col h2 {
+  display: flex; align-items: baseline; gap: 10px;
+  font: 600 1.6rem/1 "Big Shoulders Display", Impact, sans-serif;
+  margin: 0 0 10px;
+  padding-bottom: 8px;
+  border-bottom: 3px solid var(--state);
+}
+.col h2 .n { font-family: "Atkinson Hyperlegible", system-ui, sans-serif; font-size: 1rem; font-weight: 400; color: var(--muted); }
+.col.doing   { --state: var(--oak); }
+.col.todo    { --state: var(--ink); }
+.col.waiting { --state: var(--slate); }
+.col.done    { --state: var(--moss); }
+.col ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.empty { color: var(--muted); font-style: italic; margin: 4px 0 0; }
+
+/* a task: project colour as the timber edge, number as the carpenter's mark */
+.task {
+  display: grid;
+  grid-template-columns: 2.6rem 1fr;
+  gap: 0 10px;
+  background: var(--card);
+  border-left: 6px solid var(--proj, var(--rule));
+  border-radius: 2px 6px 6px 2px;
+  padding: 10px 12px 11px 8px;
+}
+.num {
+  font: 800 2.1rem/1 "Big Shoulders Display", Impact, sans-serif;
+  color: var(--muted);
+  text-align: right;
+  padding-top: 1px;
+}
+.num::before { content: "#"; font-weight: 600; font-size: 0.55em; vertical-align: 0.65em; margin-right: 1px; }
+.title { margin: 0; font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
+.meta { display: flex; flex-wrap: wrap; gap: 2px 12px; margin: 4px 0 0; font-size: 0.92rem; color: var(--muted); }
+.meta .proj { color: color-mix(in oklab, var(--proj) var(--proj-strength), var(--ink)); font-weight: 700; }
+.meta .person { color: var(--ink); }
+.meta .free { font-style: italic; }
+.meta time { font: 600 1.1rem/1.25 "Big Shoulders Display", Impact, sans-serif; letter-spacing: 0.02em; }
+.meta time.late { color: var(--brick); font-weight: 700; }
+.notes { margin: 6px 0 0; font-size: 0.92rem; color: var(--muted); max-width: 60ch; }
+.done .task { opacity: 0.72; }
+.done .title { text-decoration: line-through; text-decoration-thickness: 1px; text-decoration-color: var(--muted); }
+
+.task[hidden] { display: none; }
+footer { margin-top: 36px; color: var(--muted); font-size: 0.9rem; max-width: 60ch; }
+footer p { margin: 0 0 4px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>{{TITLE}}</h1>
+    <p class="updated">Bijgewerkt {{UPDATED}}</p>
+  </header>
+  <nav class="who" aria-label="Filter op persoon">
+    <button type="button" data-who="" aria-pressed="true">Iedereen</button>
+    {{PEOPLE}}
+    <button type="button" data-who="-" aria-pressed="false">Nog vrij</button>
+  </nav>
+  <main id="board">
+{{MAIN}}
+  </main>
+  <footer>
+    <p>Wijzigen gaat in de Signal-groep: gewoon zeggen wat er moet gebeuren, of reageren op een taak met 🙋 🔨 ⏸️ ✅.</p>
+  </footer>
+</div>
+<script>
+(() => {
+  let who = "";
+  try { who = localStorage.getItem("who") || ""; } catch (e) {}
+
+  function apply() {
+    document.querySelectorAll(".who button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.who === who)));
+    document.querySelectorAll(".col").forEach(col => {
+      let shown = 0;
+      col.querySelectorAll(".task").forEach(t => {
+        const ok = who === "" || (who === "-" ? t.dataset.who === "" : t.dataset.who === who);
+        t.hidden = !ok;
+        if (ok) shown++;
+      });
+      const n = col.querySelector("h2 .n");
+      if (n) n.textContent = shown;
+      const e = col.querySelector(".empty");
+      if (e) e.hidden = shown > 0;
+    });
+  }
+
+  document.querySelector(".who").addEventListener("click", ev => {
+    const b = ev.target.closest("button");
+    if (!b) return;
+    who = b.dataset.who;
+    try { localStorage.setItem("who", who); } catch (e) {}
+    apply();
+  });
+
+  // Quietly pull fresh content every minute, and when the tab comes back into view.
+  async function refresh() {
+    try {
+      const r = await fetch(location.href, { cache: "no-store" });
+      if (!r.ok) return;
+      const doc = new DOMParser().parseFromString(await r.text(), "text/html");
+      document.getElementById("board").innerHTML = doc.getElementById("board").innerHTML;
+      document.querySelector(".updated").textContent = doc.querySelector(".updated").textContent;
+      apply();
+    } catch (e) {}
+  }
+  setInterval(refresh, 60000);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
+
+  if (!document.querySelector(`.who button[data-who="${CSS.escape(who)}"]`)) who = "";
+  apply();
+})();
+</script>
+</body>
+</html>

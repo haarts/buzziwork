@@ -14,7 +14,7 @@ const BOARD_EDIT_WINDOW_MS: i64 = 23 * 3600 * 1000; // Signal allows edits for 2
 const BOARD_MAX_EDITS: u32 = 9; // stay under Signal's edit limit, then repost
 
 pub struct Bot<M, L> {
-    pub db: Db,
+    pub db: Arc<Db>,
     messenger: Arc<M>,
     llm: L,
     group_id: Option<String>,
@@ -45,7 +45,7 @@ fn clearable(v: &Option<String>) -> Option<Option<String>> {
 }
 
 impl<M: Messenger, L: Interpreter> Bot<M, L> {
-    pub fn new(db: Db, messenger: Arc<M>, llm: L, group_id: Option<String>, web_url: Option<String>) -> Self {
+    pub fn new(db: Arc<Db>, messenger: Arc<M>, llm: L, group_id: Option<String>, web_url: Option<String>) -> Self {
         Self {
             db,
             messenger,
@@ -101,7 +101,7 @@ impl<M: Messenger, L: Interpreter> Bot<M, L> {
             return self.refresh_board(gid, true).await;
         }
         if cmd == "/help" {
-            let help = "Praat gewoon: \"Noah doet dinsdag de goot west\" of \"#4 is klaar\".\n\
+            let help = "Praat gewoon: \"Sem doet dinsdag de goot west\" of \"#4 is klaar\".\n\
                         Reageer op een taakbericht met 🙋 (ik doe 'm), 🔨 (bezig), ⏸️ (wacht), ✅ (klaar).\n\
                         /bord — nieuw overzicht";
             self.messenger.send_group(gid, help, SendOpts::default()).await?;
@@ -473,14 +473,14 @@ mod tests {
         let sig = Arc::new(FakeSignal::default());
         let llm = FakeLlm(Mutex::new(VecDeque::from([
             r#"{"actions":[]}"#,
-            r#"{"actions":[{"op":"create_task","title":"Goot west","project":"Dakkapel","assignee":"Noah","due":"2026-10-20"}]}"#,
+            r#"{"actions":[{"op":"create_task","title":"Goot west","project":"Dakkapel","assignee":"Sem","due":"2026-10-20"}]}"#,
         ])));
-        let bot = Bot::new(Db::open(":memory:").unwrap(), sig.clone(), llm, Some("G".into()), None);
+        let bot = Bot::new(Arc::new(Db::open(":memory:").unwrap()), sig.clone(), llm, Some("G".into()), None);
 
-        bot.handle(text("u2", "Noah", 1, "hoi")).await.unwrap();
+        bot.handle(text("u2", "Sem", 1, "hoi")).await.unwrap();
         assert!(sig.sent.lock().unwrap().is_empty(), "chit-chat stays silent");
 
-        bot.handle(text("u1", "Harm", 2, "Noah doet dinsdag de goot west")).await.unwrap();
+        bot.handle(text("u1", "Harm", 2, "Sem doet dinsdag de goot west")).await.unwrap();
         let (confirm_ts, board_ts) = {
             let first = bot.db.tasks_for_message(2).unwrap();
             assert_eq!(first, vec![1]);
@@ -490,7 +490,7 @@ mod tests {
         {
             let sent = sig.sent.lock().unwrap();
             assert_eq!(sent.len(), 2, "{sent:?}"); // confirmation + new board
-            assert!(sent[0].0.starts_with("🆕 ⬜ #1 Goot west · 📁 Dakkapel · Noah · 📅 di 20/10"));
+            assert!(sent[0].0.starts_with("🆕 ⬜ #1 Goot west · 📁 Dakkapel · Sem · 📅 di 20/10"));
             assert_eq!(sent[0].1.quote, Some((2, "u1".into())));
             assert!(sent[1].0.starts_with("📋 Bord"));
         }
@@ -515,26 +515,26 @@ mod tests {
         let llm = FakeLlm(Mutex::new(VecDeque::from([
             r#"{"actions":[{"op":"create_task","title":"Steiger huren","assignee":"Piet"}]}"#,
         ])));
-        let bot = Bot::new(Db::open(":memory:").unwrap(), sig.clone(), llm, Some("G".into()), None);
+        let bot = Bot::new(Arc::new(Db::open(":memory:").unwrap()), sig.clone(), llm, Some("G".into()), None);
         bot.handle(text("u1", "Harm", 5, "Piet regelt de steiger")).await.unwrap();
         {
             let sent = sig.sent.lock().unwrap();
             assert!(sent.iter().any(|s| s.0.contains("⚠️ Ik ken \"Piet\" niet")), "{sent:?}");
         }
-        // Noah claims it by reacting 🙋‍♂️ on Harm's original message.
+        // Sem claims it by reacting 🙋‍♂️ on Harm's original message.
         bot.handle(Incoming {
             kind: Kind::Reaction { emoji: "🙋‍♂️".into(), target_ts: 5, remove: false },
-            ..text("u2", "Noah", 6, "")
+            ..text("u2", "Sem", 6, "")
         })
         .await
         .unwrap();
-        assert_eq!(bot.db.task(1).unwrap().unwrap().assignee.as_deref(), Some("Noah"));
+        assert_eq!(bot.db.task(1).unwrap().unwrap().assignee.as_deref(), Some("Sem"));
     }
 
     #[tokio::test]
     async fn other_groups_and_dms_ignored() {
         let sig = Arc::new(FakeSignal::default());
-        let bot = Bot::new(Db::open(":memory:").unwrap(), sig.clone(), FakeLlm(Mutex::new(VecDeque::new())), Some("G".into()), None);
+        let bot = Bot::new(Arc::new(Db::open(":memory:").unwrap()), sig.clone(), FakeLlm(Mutex::new(VecDeque::new())), Some("G".into()), None);
         let mut m = text("u1", "Harm", 1, "/bord");
         m.group_id = Some("OTHER".into());
         bot.handle(m.clone()).await.unwrap();

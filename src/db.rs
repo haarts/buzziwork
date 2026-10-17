@@ -323,9 +323,9 @@ mod tests {
     fn task_lifecycle() {
         let db = Db::open(":memory:").unwrap();
         let harm = db.upsert_person("u1", "Harm Aarts").unwrap();
-        db.upsert_person("u2", "Noah").unwrap();
+        db.upsert_person("u2", "Sem").unwrap();
         assert_eq!(db.find_person("harm").unwrap().unwrap().id, harm.id);
-        assert_eq!(db.find_person("@noah").unwrap().unwrap().name, "Noah");
+        assert_eq!(db.find_person("@sem").unwrap().unwrap().name, "Sem");
         assert!(db.find_person("piet").unwrap().is_none());
 
         let proj = db.project_id("Dakkapel").unwrap();

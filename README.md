@@ -5,10 +5,10 @@ You chat normally; the bot extracts tasks via an LLM, confirms them, keeps a boa
 message up to date, and listens to emoji reactions.
 
 ```
-Harm:  Noah doet dinsdag de goot west, en ik pak het zink links van de dakkapel
-bot:   🆕 ⬜ #7 Goot west · Noah · 📅 di 20/10
+Harm:  Sem doet dinsdag de goot west, en ik pak het zink links van de dakkapel
+bot:   🆕 ⬜ #7 Goot west · Sem · 📅 di 20/10
 bot:   🆕 ⬜ #8 Zink links vervangen · 📁 Dakkapel · Harm
-Noah:  (reacts 🔨 on #7)          → status doing, board edited
+Sem:  (reacts 🔨 on #7)          → status doing, board edited
 ```
 
 **Moving parts:** one Rust binary + `signal-cli` (spawned as a child, JSON-RPC over stdio) +
@@ -18,8 +18,8 @@ one SQLite file + OpenRouter. No Docker, no REST bridge.
 
 | You do | Bot does |
 |---|---|
-| Write naturally ("#4 is klaar", "Noah, kun jij vrijdag de steiger halen?") | Creates/updates tasks, confirms with 🆕 / ✏️ |
-| Ask ("wat moet Noah nog doen?") | Answers from the task list |
+| Write naturally ("#4 is klaar", "Sem, kun jij vrijdag de steiger halen?") | Creates/updates tasks, confirms with 🆕 / ✏️ |
+| Ask ("wat moet Sem nog doen?") | Answers from the task list |
 | React 🙋 on a task message | Assigns it to you |
 | React 🔨 / ⏸️ / ✅ | doing / waiting / done (removing the reaction undoes it) |
 | `/bord` (or `/board`) | Posts a fresh board |
@@ -88,6 +88,22 @@ set -a; . ./.env; set +a; ./target/release/buzziwork
 For keeps: `deploy/buzziwork.service` (systemd). The bot exits when signal-cli exits, and
 systemd restarts both.
 
+## Web board
+
+Read-only overview at `/<BOARD_TOKEN>`, served by the bot itself (same process, same
+SQLite file). Four columns (Bezig / Te doen / Wacht / Klaar), project colour on each task,
+filter on person or "nog vrij", refreshes itself every minute. Fonts are embedded in the
+binary, so the page makes no third-party requests. There's also `/<token>/tasks.json`.
+
+There's no login: the token in the URL is the key, so keep it out of public places.
+Put it behind a TLS reverse proxy, e.g. Caddy:
+
+```
+bord.example.nl {
+    reverse_proxy 127.0.0.1:8080
+}
+```
+
 ## Configuration (env)
 
 | Var | Default | |
@@ -101,7 +117,10 @@ systemd restarts both.
 | `GROUP_ID` | unset | lock to one group (recommended) |
 | `DB_PATH` | `buzziwork.db` | SQLite file |
 | `BOARD_HOUR` | `7` | local hour for the daily board |
-| `BOARD_URL` | unset | link appended to the board (web board, later) |
+| `BOARD_LISTEN` | unset | e.g. `127.0.0.1:8080` — enables the web board |
+| `BOARD_TOKEN` | — | secret path segment, required with `BOARD_LISTEN` (`openssl rand -hex 16`) |
+| `BOARD_TITLE` | `Klussen` | heading on the web board |
+| `BOARD_URL` | unset | link appended to the Signal board, e.g. `https://bord.example.nl/<token>` |
 | `RUST_LOG` | `info` | `debug` shows raw signal-cli traffic |
 
 ## Cost
