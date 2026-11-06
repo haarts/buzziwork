@@ -78,7 +78,8 @@ Rules:
 - Reuse an existing project name when it fits (case-insensitive, synonyms like dakkapel/dormer). Only put a project on a task when it clearly belongs to one.
 - To change an existing task use update_task with its #id from the task list. Omit fields you do not change. "dropped" = cancelled.
 - If several tasks are mentioned in one message, emit several actions.
-- Set "reply" only when someone asks a question (e.g. "wat moet Sem nog doen?", "wat staat er voor morgen?") — answer briefly from the task list — or when you need to flag a problem (ambiguous task, unknown person). Do NOT reply just to confirm; the bot confirms changes itself.
+- Set "reply" only when someone asks a question about the tasks that the task list actually answers (e.g. "wat moet Sem nog doen?", "wat staat er voor morgen?") — answer briefly from the task list — or when you need to flag a problem with an action you are taking (ambiguous task, unknown person). Do NOT reply just to confirm; the bot confirms changes itself.
+- Questions the task list cannot answer (opinions, prices, materials, "maakt het uit?", anything meant for the crew rather than the bot) are chat between people: reply null. Never answer with "I don't know", "I can't tell from the list" or advice. When in doubt, stay silent.
 - Reply in the language of the message. Keep it short; plain text, no markdown."#;
 
 pub struct OpenRouter {
