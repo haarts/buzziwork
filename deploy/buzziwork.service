@@ -1,15 +1,15 @@
+# systemd *user* unit: ~/.config/systemd/user/buzziwork.service
+# Needs `loginctl enable-linger $USER` so it runs without an open session.
 [Unit]
 Description=buzziwork Signal task bot
-After=network-online.target
-Wants=network-online.target
 
 [Service]
-User=buzziwork
-WorkingDirectory=/var/lib/buzziwork
-EnvironmentFile=/etc/buzziwork.env
-ExecStart=/usr/local/bin/buzziwork
+WorkingDirectory=%h/.local/share/buzziwork
+EnvironmentFile=%h/.config/buzziwork/env
+Environment=SIGNAL_CLI=%h/.local/bin/signal-cli
+ExecStart=%h/.local/bin/buzziwork
 Restart=always
 RestartSec=10
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=default.target
