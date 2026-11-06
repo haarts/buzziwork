@@ -3,7 +3,7 @@
 use crate::board;
 use crate::db::{Db, Person, STATUSES, TaskPatch};
 use crate::llm::{Action, Interpreter, Plan};
-use crate::signal::{Incoming, Kind, Messenger, SendOpts};
+use crate::signal::{Incoming, Kind, Messenger, Quote, SendOpts};
 use anyhow::Result;
 use chrono::{Local, NaiveDate, Timelike};
 use std::collections::VecDeque;
@@ -107,7 +107,7 @@ impl<M: Messenger, L: Interpreter> Bot<M, L> {
         who: &Person,
         ts: i64,
         text: &str,
-        quote: Option<(i64, String)>,
+        quote: Option<Quote>,
     ) -> Result<()> {
         let cmd = text.trim().to_lowercase();
         if cmd == "/board" || cmd == "/bord" {
@@ -128,6 +128,14 @@ impl<M: Messenger, L: Interpreter> Bot<M, L> {
             r.push_back(line.clone());
             while r.len() > RECENT_LINES {
                 r.pop_front();
+            }
+        }
+
+        // People replying to each other's chat is none of our business. Replies to the
+        // bot, or to any message tied to a task, still go through.
+        if let Some(q) = &quote {
+            if self.is_person_chat(q)? {
+                return Ok(());
             }
         }
 
@@ -428,9 +436,19 @@ impl<M: Messenger, L: Interpreter> Bot<M, L> {
         }
     }
 
+    /// A quoted message written by a crew member (not the bot) that isn't about a task.
+    fn is_person_chat(&self, q: &Quote) -> Result<bool> {
+        let Some(author) = &q.author else { return Ok(false) };
+        if !self.db.tasks_for_message(q.ts)?.is_empty() {
+            return Ok(false);
+        }
+        // The bot never ends up in `people`, so a known uuid means a human wrote it.
+        Ok(self.db.people()?.iter().any(|p| &p.uuid == author))
+    }
+
     // ------------------------------------------------------------ LLM context
 
-    fn context(&self, who: &Person, quote: Option<&(i64, String)>) -> Result<String> {
+    fn context(&self, who: &Person, quote: Option<&Quote>) -> Result<String> {
         let d = today();
         let mut s = format!("Today: {} ({})\nSender: {}\n", d, d.format("%A"), who.name);
         let people: Vec<String> = self.db.people()?.into_iter().map(|p| p.name).collect();
@@ -458,9 +476,9 @@ impl<M: Messenger, L: Interpreter> Bot<M, L> {
                 s.push('\n');
             }
         }
-        if let Some((qts, qtext)) = quote {
-            let ids = self.db.tasks_for_message(*qts)?;
-            s.push_str(&format!("The new message is a reply to: \"{qtext}\""));
+        if let Some(q) = quote {
+            let ids = self.db.tasks_for_message(q.ts)?;
+            s.push_str(&format!("The new message is a reply to: \"{}\"", q.text));
             if !ids.is_empty() {
                 let ids: Vec<String> = ids.iter().map(|i| format!("#{i}")).collect();
                 s.push_str(&format!(" (that message is about task {})", ids.join(", ")));
@@ -616,6 +634,39 @@ mod tests {
         bot.handle(text("u2", "Sem", 5, "toch niet, wordt 1 december")).await.unwrap();
         assert_eq!(sig.reactions.lock().unwrap().len(), 3);
         assert!(sig.sent.lock().unwrap().iter().any(|s| s.0.starts_with("✏️")));
+    }
+
+    #[tokio::test]
+    async fn replies_between_people_are_ignored() {
+        let sig = Arc::new(FakeSignal::default());
+        let llm = FakeLlm(Mutex::new(VecDeque::from([
+            r#"{"actions":[]}"#,
+            r#"{"actions":[{"op":"create_task","title":"Goot west"}]}"#,
+            // Would fire if the quote-to-a-person check didn't stop it first:
+            r#"{"reply":"Bedoel je #1?","actions":[]}"#,
+            r#"{"actions":[{"op":"update_task","id":1,"status":"done"}]}"#,
+        ])));
+        let bot = Bot::new(Arc::new(Db::open(":memory:").unwrap()), sig.clone(), llm, Some("G".into()), None);
+        let reply = |uuid: &str, name: &str, ts: i64, t: &str, q_ts: i64, q_author: &str| Incoming {
+            kind: Kind::Text {
+                text: t.into(),
+                quote: Some(Quote { ts: q_ts, text: "…".into(), author: Some(q_author.into()) }),
+            },
+            ..text(uuid, name, ts, "")
+        };
+        bot.handle(text("u2", "Sem", 1, "wie haalt er koffie?")).await.unwrap();
+        bot.handle(text("u1", "Harm", 2, "goot west moet nog")).await.unwrap();
+        let before = sig.sent.lock().unwrap().len();
+
+        // Harm replies to Sem's chit-chat: not a task message → no LLM, nothing sent.
+        bot.handle(reply("u1", "Harm", 3, "ik, maar de goot is ook klaar", 1, "u2")).await.unwrap();
+        assert_eq!(sig.sent.lock().unwrap().len(), before);
+        assert_eq!(bot.db.task(1).unwrap().unwrap().status, "todo");
+
+        // Sem replies to Harm's task message: still handled (gets the next canned plan).
+        bot.llm.0.lock().unwrap().pop_front();
+        bot.handle(reply("u2", "Sem", 4, "klaar", 2, "u1")).await.unwrap();
+        assert_eq!(bot.db.task(1).unwrap().unwrap().status, "done");
     }
 
     #[tokio::test]

@@ -190,13 +190,22 @@ pub enum Kind {
     Text {
         text: String,
         /// (timestamp, text) of the message being replied to.
-        quote: Option<(i64, String)>,
+        quote: Option<Quote>,
     },
     Reaction {
         emoji: String,
         target_ts: i64,
         remove: bool,
     },
+}
+
+/// The message a text message replies to.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Quote {
+    pub ts: i64,
+    pub text: String,
+    /// Author's uuid, when signal-cli tells us.
+    pub author: Option<String>,
 }
 
 /// Turn the params of a `receive` notification into something we care about.
@@ -238,10 +247,15 @@ pub fn parse_incoming(params: &Value) -> Option<Incoming> {
             return None;
         }
         let quote = dm.get("quote").and_then(|q| {
-            Some((
-                q.get("id")?.as_i64()?,
-                q.get("text").and_then(Value::as_str).unwrap_or("").to_string(),
-            ))
+            Some(Quote {
+                ts: q.get("id")?.as_i64()?,
+                text: q.get("text").and_then(Value::as_str).unwrap_or("").to_string(),
+                author: q
+                    .get("authorUuid")
+                    .or_else(|| q.get("author"))
+                    .and_then(Value::as_str)
+                    .map(String::from),
+            })
         });
         Kind::Text { text, quote }
     };
@@ -309,7 +323,7 @@ mod tests {
             i.kind,
             Kind::Text {
                 text: "@Sem doe jij de goot?".into(),
-                quote: Some((5, "goot west".into()))
+                quote: Some(Quote { ts: 5, text: "goot west".into(), author: Some("x".into()) })
             }
         );
     }

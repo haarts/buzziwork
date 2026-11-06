@@ -20,7 +20,8 @@ Dutch-speaking). Owner: Harm (harm@aarts.email). Read README.md for user-facing 
   No structured-output API dependency on purpose (portable across models).
 - **UX:** chat stays the interface. Bot is silent on chit-chat, confirms changes with one
   line per task (🆕/✏️), answers questions. A chat message that only moves a task to
-  doing/waiting/done gets a 🔨/⏸️/✅ reaction instead of a text line. Reactions: 🙋 claim, 🔨 doing, ⏸️ waiting,
+  doing/waiting/done gets a 🔨/⏸️/✅ reaction instead of a text line. Replies (quotes)
+  between people are ignored unless the quoted message is tied to a task. Reactions: 🙋 claim, 🔨 doing, ⏸️ waiting,
   ✅ done; removing a reaction reverts.
 - **Board:** a text message, edited in place on every change (Signal 24h edit window;
   repost after 9 edits), reposted daily at `BOARD_HOUR`.
@@ -59,7 +60,7 @@ that speaks the JSON-RPC protocol and `OPENROUTER_BASE_URL` at a local fake.
 - `editTimestamp` / `quoteTimestamp` / `quoteAuthor` param names in jsonRpc `send`
 - `sendReaction` params (`groupId`, `emoji`, `targetAuthor`, `targetTimestamp`)
 - exact `receive` envelope fields for reactions (`reaction.targetSentTimestamp`, `isRemove`),
-  quotes (`quote.id`, `quote.text`) and mentions (`start`, `name`/`uuid`)
+  quotes (`quote.id`, `quote.text`, `quote.authorUuid`) and mentions (`start`, `name`/`uuid`)
 - edit-limit behaviour of Signal clients
 
 ## Next

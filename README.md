@@ -28,7 +28,8 @@ one SQLite file + OpenRouter. No Docker, no REST bridge.
 | `/bord` (or `/board`) | Posts a fresh board |
 | `/help` | Short help |
 
-The bot reads every message but stays silent on chit-chat. Reactions work on the bot's
+The bot reads every message but stays silent on chit-chat, and ignores replies between
+people unless the quoted message is about a task. Reactions work on the bot's
 confirmation **and** on the original message that created the task.
 
 The board is reposted daily at `BOARD_HOUR` and edited in place on every change
