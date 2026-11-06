@@ -26,6 +26,19 @@ pub struct Bot<M, L> {
 enum Change {
     Created(i64),
     Updated(i64),
+    /// Only the status moved to doing/waiting/done (possibly also claiming it for the sender).
+    /// Acknowledged with a reaction on the sender's message instead of a text line.
+    Status(i64, &'static str),
+}
+
+/// Reaction the bot uses to acknowledge a status-only change.
+fn ack_emoji(status: &str) -> Option<&'static str> {
+    match status {
+        "doing" => Some("🔨"),
+        "waiting" => Some("⏸️"),
+        "done" => Some("✅"),
+        _ => None,
+    }
 }
 
 fn today() -> NaiveDate {
@@ -150,10 +163,29 @@ impl<M: Messenger, L: Interpreter> Bot<M, L> {
         }
 
         let quote = || SendOpts { quote: Some((msg_ts, who.uuid.clone())), ..Default::default() };
+
+        // Status-only changes get a single reaction on the sender's message — if they all
+        // agree on the emoji (Signal allows one reaction per message). Otherwise spell them out.
+        let mut acks = changes.iter().filter_map(|c| match c {
+            Change::Status(_, e) => Some(*e),
+            _ => None,
+        });
+        let ack = acks.next().filter(|first| acks.all(|e| e == *first));
+        if let Some(emoji) = ack {
+            self.messenger.react_group(gid, emoji, &who.uuid, msg_ts).await?;
+            for c in &changes {
+                if let Change::Status(id, _) = c {
+                    self.db.link_message(msg_ts, *id)?;
+                }
+            }
+        }
+
         for c in &changes {
             let (prefix, id) = match c {
                 Change::Created(id) => ("🆕", *id),
                 Change::Updated(id) => ("✏️", *id),
+                Change::Status(_, _) if ack.is_some() => continue,
+                Change::Status(id, _) => ("✏️", *id),
             };
             let Some(t) = self.db.task(id)? else { continue };
             let msg = format!("{prefix} {}", board::task_line(&t, today(), true));
@@ -234,10 +266,10 @@ impl<M: Messenger, L: Interpreter> Bot<M, L> {
                 Ok(Some(Change::Created(id)))
             }
             Action::UpdateTask { id, title, project, assignee, due, notes, status } => {
-                if self.db.task(*id)?.is_none() {
+                let Some(before) = self.db.task(*id)? else {
                     problems.push(format!("Taak #{id} bestaat niet"));
                     return Ok(None);
-                }
+                };
                 let mut p = TaskPatch {
                     title: title.clone().filter(|t| !t.trim().is_empty()),
                     notes: clearable(notes),
@@ -276,9 +308,21 @@ impl<M: Messenger, L: Interpreter> Bot<M, L> {
                 if p.is_empty() {
                     return Ok(None);
                 }
+                // Quiet if only the status changed (to doing/waiting/done), optionally with the
+                // sender claiming it — "ben bezig met de goot", "goot is klaar".
+                let quiet = p.title.is_none()
+                    && p.notes.is_none()
+                    && p.project_id.is_none()
+                    && p.due_date.is_none()
+                    && p.assignee_id.is_none_or(|a| a == Some(who.id))
+                    && p.status.as_deref().is_some_and(|s| s != before.status);
+                let ack = p.status.as_deref().and_then(ack_emoji).filter(|_| quiet);
                 self.db.update_task(*id, &p)?;
                 self.db.log(Some(*id), Some(who.id), "update", &format!("{action:?}"))?;
-                Ok(Some(Change::Updated(*id)))
+                Ok(Some(match ack {
+                    Some(e) => Change::Status(*id, e),
+                    None => Change::Updated(*id),
+                }))
             }
         }
     }
@@ -436,17 +480,22 @@ mod tests {
     /// Hands out realistic timestamps: T0, T0+1, ...
     struct FakeSignal {
         sent: Mutex<Vec<(String, SendOpts)>>,
+        reactions: Mutex<Vec<(String, String, i64)>>,
         ts: AtomicI64,
     }
     impl Default for FakeSignal {
         fn default() -> Self {
-            Self { sent: Mutex::default(), ts: AtomicI64::new(chrono::Utc::now().timestamp_millis()) }
+            Self { sent: Mutex::default(), reactions: Mutex::default(), ts: AtomicI64::new(chrono::Utc::now().timestamp_millis()) }
         }
     }
     impl Messenger for FakeSignal {
         async fn send_group(&self, _g: &str, text: &str, opts: SendOpts) -> Result<i64> {
             self.sent.lock().unwrap().push((text.to_string(), opts));
             Ok(self.ts.fetch_add(1, Ordering::Relaxed))
+        }
+        async fn react_group(&self, _g: &str, emoji: &str, author: &str, ts: i64) -> Result<()> {
+            self.reactions.lock().unwrap().push((emoji.to_string(), author.to_string(), ts));
+            Ok(())
         }
     }
 
@@ -473,7 +522,7 @@ mod tests {
         let sig = Arc::new(FakeSignal::default());
         let llm = FakeLlm(Mutex::new(VecDeque::from([
             r#"{"actions":[]}"#,
-            r#"{"actions":[{"op":"create_task","title":"Goot west","project":"Dakkapel","assignee":"Sem","due":"2026-10-20"}]}"#,
+            r#"{"actions":[{"op":"create_task","title":"Goot west","project":"Dakkapel","assignee":"Sem","due":"2099-10-20"}]}"#,
         ])));
         let bot = Bot::new(Arc::new(Db::open(":memory:").unwrap()), sig.clone(), llm, Some("G".into()), None);
 
@@ -529,6 +578,44 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(bot.db.task(1).unwrap().unwrap().assignee.as_deref(), Some("Sem"));
+    }
+
+    #[tokio::test]
+    async fn status_only_updates_get_a_reaction() {
+        let sig = Arc::new(FakeSignal::default());
+        let llm = FakeLlm(Mutex::new(VecDeque::from([
+            r#"{"actions":[{"op":"create_task","title":"Goot west"}]}"#,
+            r#"{"actions":[{"op":"update_task","id":1,"status":"doing","assignee":"Sem"}]}"#,
+            r#"{"actions":[{"op":"update_task","id":1,"status":"waiting"}]}"#,
+            r#"{"actions":[{"op":"update_task","id":1,"status":"done"}]}"#,
+            r#"{"actions":[{"op":"update_task","id":1,"status":"doing","due":"2099-12-01"}]}"#,
+        ])));
+        let bot = Bot::new(Arc::new(Db::open(":memory:").unwrap()), sig.clone(), llm, Some("G".into()), None);
+        bot.handle(text("u1", "Harm", 1, "goot west moet nog")).await.unwrap();
+        bot.handle(text("u2", "Sem", 2, "ik ben met de goot bezig")).await.unwrap();
+        bot.handle(text("u2", "Sem", 3, "wacht op de zinkwerker")).await.unwrap();
+        bot.handle(text("u2", "Sem", 4, "goot is klaar")).await.unwrap();
+
+        assert_eq!(bot.db.task(1).unwrap().unwrap().status, "done");
+        assert_eq!(bot.db.task(1).unwrap().unwrap().assignee.as_deref(), Some("Sem"));
+        assert_eq!(
+            *sig.reactions.lock().unwrap(),
+            vec![
+                ("🔨".into(), "u2".into(), 2),
+                ("⏸️".into(), "u2".into(), 3),
+                ("✅".into(), "u2".into(), 4)
+            ]
+        );
+        assert_eq!(bot.db.tasks_for_message(4).unwrap(), vec![1], "reacting on it later still works");
+        {
+            let sent = sig.sent.lock().unwrap();
+            assert!(!sent.iter().any(|s| s.0.starts_with("✏️")), "no text confirmation: {sent:?}");
+        }
+
+        // Anything beyond the status is still spelled out.
+        bot.handle(text("u2", "Sem", 5, "toch niet, wordt 1 december")).await.unwrap();
+        assert_eq!(sig.reactions.lock().unwrap().len(), 3);
+        assert!(sig.sent.lock().unwrap().iter().any(|s| s.0.starts_with("✏️")));
     }
 
     #[tokio::test]

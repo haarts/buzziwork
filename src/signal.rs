@@ -41,6 +41,15 @@ pub trait Messenger: Send + Sync {
         text: &str,
         opts: SendOpts,
     ) -> impl Future<Output = Result<i64>> + Send;
+
+    /// React with `emoji` to the group message (`target_author`, `target_ts`).
+    fn react_group(
+        &self,
+        group_id: &str,
+        emoji: &str,
+        target_author: &str,
+        target_ts: i64,
+    ) -> impl Future<Output = Result<()>> + Send;
 }
 
 impl Signal {
@@ -151,6 +160,17 @@ impl Messenger for Signal {
         r.get("timestamp")
             .and_then(Value::as_i64)
             .ok_or_else(|| anyhow!("send returned no timestamp: {r}"))
+    }
+
+    async fn react_group(&self, group_id: &str, emoji: &str, target_author: &str, target_ts: i64) -> Result<()> {
+        let params = json!({
+            "groupId": group_id,
+            "emoji": emoji,
+            "targetAuthor": target_author,
+            "targetTimestamp": target_ts,
+        });
+        self.request("sendReaction", params).await?;
+        Ok(())
     }
 }
 

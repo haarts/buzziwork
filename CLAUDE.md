@@ -7,15 +7,20 @@ Dutch-speaking). Owner: Harm (harm@aarts.email). Read README.md for user-facing 
 
 - **Minimal moving parts.** Rust binary spawns `signal-cli jsonRpc` as a child and speaks
   newline-delimited JSON-RPC over stdin/stdout. No Docker, no signal-cli-rest-api, no D-Bus.
-- **Bot account:** preferably a numberless Signal account (Signal Login, Android beta 8.28,
-  Sept 2026) with signal-cli linked as secondary device. signal-cli support for numberless
-  accounts is unverified — first thing to test on real hardware. Fallback: prepaid SIM.
+- **Bot account:** own phone number (dumb phone / prepaid SIM), registered directly with
+  `signal-cli register` + `verify` — signal-cli is the primary device. Numberless accounts
+  (Signal Login) were considered but judged not ready yet.
+- **Deploy:** `deploy/deploy.sh` → racknerd, runs as user `harm` with a systemd *user* unit
+  (lingering on), binaries in `~/.local/bin`, config `~/.config/buzziwork/env`, data in
+  `~/.local/share/buzziwork`. Built on the server in a `rust:1-bookworm` container (local
+  glibc is newer than the server's). Caddy (system service, root) reverse-proxies the board.
 - **Storage:** single SQLite file (rusqlite, bundled). Schema in `src/db.rs`.
 - **LLM:** OpenRouter, default `anthropic/claude-haiku-5.5`. Prompt in `src/llm.rs`.
   The model returns a JSON plan (`reply` + `actions`); we parse leniently (code fences ok).
   No structured-output API dependency on purpose (portable across models).
 - **UX:** chat stays the interface. Bot is silent on chit-chat, confirms changes with one
-  line per task (🆕/✏️), answers questions. Reactions: 🙋 claim, 🔨 doing, ⏸️ waiting,
+  line per task (🆕/✏️), answers questions. A chat message that only moves a task to
+  doing/waiting/done gets a 🔨/⏸️/✅ reaction instead of a text line. Reactions: 🙋 claim, 🔨 doing, ⏸️ waiting,
   ✅ done; removing a reaction reverts.
 - **Board:** a text message, edited in place on every change (Signal 24h edit window;
   repost after 9 edits), reposted daily at `BOARD_HOUR`.
@@ -52,6 +57,7 @@ that speaks the JSON-RPC protocol and `OPENROUTER_BASE_URL` at a local fake.
 ## Not yet verified against real signal-cli
 
 - `editTimestamp` / `quoteTimestamp` / `quoteAuthor` param names in jsonRpc `send`
+- `sendReaction` params (`groupId`, `emoji`, `targetAuthor`, `targetTimestamp`)
 - exact `receive` envelope fields for reactions (`reaction.targetSentTimestamp`, `isRemove`),
   quotes (`quote.id`, `quote.text`) and mentions (`start`, `name`/`uuid`)
 - edit-limit behaviour of Signal clients
