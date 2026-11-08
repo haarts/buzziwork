@@ -24,7 +24,7 @@ Dutch-speaking). Owner: Harm (harm@aarts.email). Read README.md for user-facing 
   between people are ignored unless the quoted message is tied to a task. Reactions: 🙋 claim, 🔨 doing, ⏸️ waiting,
   ✅ done; removing a reaction reverts.
 - **Board:** a text message, edited in place on every change (Signal 24h edit window;
-  repost after 9 edits), reposted daily at `BOARD_HOUR`.
+  repost after 9 edits), reposted every Monday at `BOARD_HOUR` (not daily; Harm's choice).
 - **Trello-ish model, one level deep:** project → task. No checklists/labels/priorities yet.
   Statuses: todo | doing | waiting | done | dropped.
 - UI strings are Dutch.
@@ -42,7 +42,7 @@ kv(key, value) — board_ts, board_edits, board_text, board_daily, group_id.
 
 - `src/signal.rs` — JSON-RPC client, `Messenger` trait, `parse_incoming` (envelope → `Incoming`)
 - `src/llm.rs` — `Interpreter` trait, OpenRouter impl, prompt, `Plan`/`Action`
-- `src/bot.rs` — message/reaction handling, applying actions, board refresh, daily loop, LLM context
+- `src/bot.rs` — message/reaction handling, applying actions, board refresh, weekly loop, LLM context
 - `src/board.rs` — text rendering for Signal
 - `src/web.rs` + `src/board.html` — read-only web board (axum), token in path, fonts embedded from `static/fonts`
 - `src/db.rs` — SQLite
@@ -69,4 +69,4 @@ that speaks the JSON-RPC protocol and `OPENROUTER_BASE_URL` at a local fake.
 2. Web board polish once real data flows (it exists: `src/web.rs`). Design: limewash/slate
    palette, Big Shoulders Display for numbers/headings, Atkinson Hyperlegible for text
    (readable in sunlight on site); keep that direction.
-3. Reminders for due/overdue tasks in the daily board or a DM.
+3. Reminders for due/overdue tasks in the Monday board or a DM.

@@ -5,7 +5,7 @@ use crate::db::{Db, Person, STATUSES, TaskPatch};
 use crate::llm::{Action, Interpreter, Plan};
 use crate::signal::{Incoming, Kind, Messenger, Quote, SendOpts};
 use anyhow::Result;
-use chrono::{Local, NaiveDate, Timelike};
+use chrono::{Datelike, Local, NaiveDate, NaiveDateTime, Timelike, Weekday};
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
@@ -43,6 +43,12 @@ fn ack_emoji(status: &str) -> Option<&'static str> {
 
 fn today() -> NaiveDate {
     Local::now().date_naive()
+}
+
+/// The scheduled board goes out on Mondays only, at or after `hour`, once per day.
+/// `last` is the date (YYYY-MM-DD) of the previous scheduled post.
+fn weekly_board_due(now: NaiveDateTime, hour: u32, last: Option<&str>) -> bool {
+    now.weekday() == Weekday::Mon && now.hour() >= hour && last != Some(now.date().to_string().as_str())
 }
 
 /// "none"/"" → clear (Some(None)); anything else → set.
@@ -417,13 +423,13 @@ impl<M: Messenger, L: Interpreter> Bot<M, L> {
         Ok(())
     }
 
-    /// Post a fresh board once a day at `hour` (local time).
-    pub async fn daily_loop(self: Arc<Self>, hour: u32) {
+    /// Post a fresh board every Monday at `hour` (local time).
+    pub async fn weekly_loop(self: Arc<Self>, hour: u32) {
         loop {
             tokio::time::sleep(std::time::Duration::from_secs(60)).await;
-            let now = Local::now();
-            let date = now.date_naive().to_string();
-            if now.hour() < hour || self.db.get("board_daily").ok().flatten().as_deref() == Some(date.as_str()) {
+            let now = Local::now().naive_local();
+            let date = now.date().to_string();
+            if !weekly_board_due(now, hour, self.db.get("board_daily").ok().flatten().as_deref()) {
                 continue;
             }
             let Some(gid) = self.group() else { continue };
@@ -431,7 +437,7 @@ impl<M: Messenger, L: Interpreter> Bot<M, L> {
                 Ok(()) => {
                     let _ = self.db.set("board_daily", &date);
                 }
-                Err(e) => log::error!("daily board failed: {e:#}"),
+                Err(e) => log::error!("weekly board failed: {e:#}"),
             }
         }
     }
@@ -532,6 +538,19 @@ mod tests {
             timestamp: ts,
             group_id: Some("G".into()),
             kind: Kind::Text { text: t.into(), quote: None },
+        }
+    }
+
+    #[test]
+    fn weekly_board_only_on_monday() {
+        let at = |d: &str, h: u32| NaiveDate::parse_from_str(d, "%Y-%m-%d").unwrap().and_hms_opt(h, 0, 0).unwrap();
+        // 2026-11-09 is a Monday.
+        assert!(weekly_board_due(at("2026-11-09", 7), 7, None));
+        assert!(weekly_board_due(at("2026-11-09", 15), 7, Some("2026-11-02")));
+        assert!(!weekly_board_due(at("2026-11-09", 6), 7, None), "before BOARD_HOUR");
+        assert!(!weekly_board_due(at("2026-11-09", 8), 7, Some("2026-11-09")), "already posted");
+        for d in ["2026-11-10", "2026-11-11", "2026-11-12", "2026-11-13", "2026-11-14", "2026-11-15"] {
+            assert!(!weekly_board_due(at(d, 9), 7, None), "{d} is not a Monday");
         }
     }
 

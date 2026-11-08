@@ -32,7 +32,7 @@ The bot reads every message but stays silent on chit-chat, and ignores replies b
 people unless the quoted message is about a task. Reactions work on the bot's
 confirmation **and** on the original message that created the task.
 
-The board is reposted daily at `BOARD_HOUR` and edited in place on every change
+The board is reposted every Monday at `BOARD_HOUR` and edited in place on every change
 (Signal allows edits for 24 h; after 9 edits it reposts).
 
 ## Setup
@@ -121,7 +121,7 @@ bord.example.nl {
 | `SIGNAL_CONFIG_DIR` | signal-cli default | passed as `--config` |
 | `GROUP_ID` | unset | lock to one group (recommended) |
 | `DB_PATH` | `buzziwork.db` | SQLite file |
-| `BOARD_HOUR` | `7` | local hour for the daily board |
+| `BOARD_HOUR` | `7` | local hour for the Monday board |
 | `BOARD_LISTEN` | unset | e.g. `127.0.0.1:8080` — enables the web board |
 | `BOARD_TOKEN` | — | secret path segment, required with `BOARD_LISTEN` (`openssl rand -hex 16`) |
 | `BOARD_TITLE` | `Klussen` | heading on the web board |

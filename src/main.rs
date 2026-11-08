@@ -44,7 +44,7 @@ async fn main() -> Result<()> {
 
     let (sig, mut rx) = signal::Signal::spawn(&signal_cli, account.as_deref(), config_dir.as_deref())?;
     let bot = Arc::new(bot::Bot::new(db, sig, llm, group_id, web_url));
-    tokio::spawn(bot.clone().daily_loop(board_hour));
+    tokio::spawn(bot.clone().weekly_loop(board_hour));
 
     log::info!("buzziwork running");
     while let Some(params) = rx.recv().await {
